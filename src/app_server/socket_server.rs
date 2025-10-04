@@ -45,10 +45,11 @@ async fn handle_client(mut socket: TcpStream) {
             Ok(n) => {
                 let received = String::from_utf8_lossy(&buf[..n]).into_owned();
                 let cmd = parse_command(received.chars());
-                let resp = match cmd {
+                let mut resp = match cmd {
                     Ok(req) => handle(req),
                     Err(e) => format!("-ERR unknown command: {e}"),
                 };
+                resp.push_str("\r\n");
                 socket.write_all(resp.as_bytes()).await.unwrap();
             }
             Err(e) => {

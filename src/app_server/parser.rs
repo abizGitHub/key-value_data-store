@@ -8,6 +8,22 @@ pub enum Command {
     DEL { key: String },
 }
 
+impl ToString for Command {
+    fn to_string(&self) -> String {
+        match self {
+            Self::GET { key } => format!("*2\r\n$3\r\nGET\r\n${}\r\n{}\r\n", key.len(), key),
+            Self::DEL { key } => format!("*2\r\n$3\r\nDEL\r\n${}\r\n{}\r\n", key.len(), key),
+            Self::SET { key, value } => format!(
+                "*3\r\n$3\r\nSET\r\n${}\r\n{}\r\n${}\r\n{}\r\n",
+                key.len(),
+                key,
+                value.len(),
+                value
+            ),
+        }
+    }
+}
+
 // '*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$4\r\value\r\n'
 pub fn parse_command(mut cmd_seq: Chars<'_>) -> Result<Command, Error> {
     if !is_char('*', &mut cmd_seq) {

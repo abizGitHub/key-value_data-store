@@ -18,3 +18,77 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod base_command_tests {
+    use std::{
+        io::{Read, Write},
+        net::TcpStream,
+        thread,
+        time::Duration,
+    };
+
+    use ctor::ctor;
+    use kvds::app_server::{parser::Command, socket_server::AppServer};
+
+    #[ctor]
+    fn global_setup() {
+        thread::spawn(|| {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(async { AppServer::new("7878").start().await });
+        });
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    #[test]
+    fn set_then_get_and_delete() {
+        let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
+        // ======================= SET A VALUE ========================
+        let set_cmd = Command::SET {
+            key: "some-key".to_string(),
+            value: "some-value".to_string(),
+        };
+        stream.write_all(set_cmd.to_string().as_bytes()).unwrap();
+        let mut buffer = [0; 512];
+        let n = stream.read(&mut buffer).unwrap();
+
+        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "+OK\r\n");
+
+        // ====================== GET THE VALUE =====================
+        let get_cmd = Command::GET {
+            key: "some-key".to_string(),
+        };
+        stream.write_all(get_cmd.to_string().as_bytes()).unwrap();
+        let mut buffer: [u8; 512] = [0; 512];
+        let n = stream.read(&mut buffer).unwrap();
+
+        assert_eq!(
+            String::from_utf8_lossy(&buffer[..n]),
+            "$10\r\nsome-value\r\n"
+        );
+
+        // ====================== DEL THE VALUE =====================
+        let del_cmd = Command::DEL {
+            key: "some-key".to_string(),
+        };
+        stream.write_all(del_cmd.to_string().as_bytes()).unwrap();
+        let mut buffer: [u8; 512] = [0; 512];
+        let n = stream.read(&mut buffer).unwrap();
+
+        assert_eq!(String::from_utf8_lossy(&buffer[..n]), ":1\r\n");
+
+        // ======================= GET NULL =====================
+        let get_cmd = Command::GET {
+            key: "some-key".to_string(),
+        };
+        stream.write_all(get_cmd.to_string().as_bytes()).unwrap();
+        let mut buffer: [u8; 512] = [0; 512];
+        let n = stream.read(&mut buffer).unwrap();
+
+        assert_eq!(
+            String::from_utf8_lossy(&buffer[..n]),
+            "$-1\r\n"
+        );
+    }
+}
