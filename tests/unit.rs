@@ -86,9 +86,6 @@ mod base_command_tests {
         let mut buffer: [u8; 512] = [0; 512];
         let n = stream.read(&mut buffer).unwrap();
 
-        assert_eq!(
-            String::from_utf8_lossy(&buffer[..n]),
-            "$-1\r\n"
-        );
+        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "$-1\r\n");
     }
 }

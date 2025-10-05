@@ -1,4 +1,5 @@
 use crate::app_server::parser::Command;
+use crate::services::persistence_service::persist_log;
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -7,7 +8,12 @@ use std::sync::RwLock;
 static GLOBAL_STORE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub fn handle(cmd: Command) -> String {
+pub async fn handle(cmd: Command) -> String {
+    if let Command::GET { key: _ } = &cmd {
+    } else {
+        persist_log(&cmd).await;
+    }
+
     match cmd {
         Command::GET { key } => match GLOBAL_STORE.read().unwrap().get(&key) {
             Some(value) => format!("${}\r\n{}", value.len(), value),
@@ -20,6 +26,6 @@ pub fn handle(cmd: Command) -> String {
         Command::SET { key, value } => {
             GLOBAL_STORE.write().unwrap().insert(key, value);
             "+OK".to_string()
-        },
+        }
     }
 }
