@@ -3,6 +3,7 @@ use tokio::net::{TcpListener, TcpStream};
 
 use crate::app_server::parser::parse_command;
 use crate::services::command_handler::handle;
+use crate::services::persistence_service;
 
 pub struct AppServer {
     port: String,
@@ -16,6 +17,7 @@ impl AppServer {
     }
 
     pub async fn start(&self) -> tokio::io::Result<()> {
+        persistence_service::load_data().await;
         let url = format!("127.0.0.1:{}", self.port);
         let listener = TcpListener::bind(&url).await?;
         println!("Async server running on {url}");
@@ -46,7 +48,7 @@ async fn handle_client(mut socket: TcpStream) {
                 let received = String::from_utf8_lossy(&buf[..n]).into_owned();
                 let cmd = parse_command(received.chars());
                 let mut resp = match cmd {
-                    Ok(req) => handle(req),
+                    Ok(req) => handle(req).await,
                     Err(e) => format!("-ERR unknown command: {e}"),
                 };
                 resp.push_str("\r\n");
