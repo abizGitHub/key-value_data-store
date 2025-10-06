@@ -1,6 +1,7 @@
 use crate::app_server::parser::Command;
 use crate::services::persistence_service::persist_log;
 
+use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -9,8 +10,10 @@ static GLOBAL_STORE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub async fn handle(cmd: Command) -> String {
-    if let Command::GET { key: _ } = &cmd {
-    } else {
+    if matches!(
+        cmd,
+        Command::SET { key: _, value: _ } | Command::DEL { key: _ }
+    ) {
         persist_log(&cmd).await;
     }
 
@@ -26,6 +29,26 @@ pub async fn handle(cmd: Command) -> String {
         Command::SET { key, value } => {
             GLOBAL_STORE.write().unwrap().insert(key, value);
             "+OK".to_string()
+        }
+        Command::KEYS { pattern } => {
+            let glob: Glob = Glob::new(&pattern).expect("Invalid glob pattern");
+            let matcher: GlobMatcher = glob.compile_matcher();
+
+            let keys = GLOBAL_STORE
+                .read()
+                .unwrap()
+                .keys()
+                .filter(|&k| matcher.is_match(k))
+                .map(|k| k.clone())
+                .collect::<Vec<String>>();
+
+            let ln = keys.len();
+
+            keys.into_iter()
+                .fold(String::from(format!("*{}", ln)), |mut acc, k| {
+                    acc.push_str(format!("\r\n${}\r\n{}", k.len(), k).as_str());
+                    acc
+                })
         }
     }
 }
