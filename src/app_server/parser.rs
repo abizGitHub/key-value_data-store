@@ -8,9 +8,32 @@ pub enum Command {
     DEL { key: String },
     KEYS { pattern: String },
     EXPIRE { key: String, sec: u64 },
+    FLUSHALL,
 }
 
 impl Command {
+    pub fn cmd_set(key: &str, value: &str) -> Self {
+        Self::SET {
+            key: key.to_string(),
+            value: value.to_string(),
+        }
+    }
+    pub fn cmd_get(key: &str) -> Self {
+        Self::GET {
+            key: key.to_string(),
+        }
+    }
+    pub fn cmd_del(key: &str) -> Self {
+        Self::DEL {
+            key: key.to_string(),
+        }
+    }
+    pub fn cmd_expire(key: &str, sec: u64) -> Self {
+        Self::EXPIRE {
+            key: key.to_string(),
+            sec,
+        }
+    }
     pub fn cmd_keys(pat: &str) -> Self {
         Self::KEYS {
             pattern: pat.to_string(),
@@ -59,6 +82,7 @@ impl ToString for Command {
                 sec.to_string().len(),
                 sec
             ),
+            Self::FLUSHALL => "*1\r\n$8\r\nFLUSHALL\r\n".to_string(),
         }
     }
 }
@@ -89,6 +113,7 @@ pub fn parse_command(cmd: String) -> Result<Command, Error> {
             let sec = cmd_parts.next().ok_or(Error)?.parse().unwrap();
             Ok(Command::EXPIRE { key, sec })
         }
+        "FLUSHALL" => Ok(Command::FLUSHALL),
         _ => Err(Error),
     }
 }

@@ -1,5 +1,5 @@
 use crate::app_server::parser::Command;
-use crate::services::persistence_service::persist_log;
+use crate::services::persistence_service::{clear_log_file, persist_log};
 use crate::services::timer_service::do_after_delay;
 
 use globset::{Glob, GlobMatcher};
@@ -11,14 +11,7 @@ use std::time::Duration;
 static GLOBAL_STORE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub async fn handle(cmd: Command) -> String {
-    if matches!(
-        cmd,
-        Command::SET { key: _, value: _ } | Command::DEL { key: _ }
-    ) {
-        persist_log(&cmd).await;
-    }
-
+pub async fn handle_on_memory(cmd: Command) -> String {
     match cmd {
         Command::GET { key } => match GLOBAL_STORE.read().unwrap().get(&key) {
             Some(value) => format!("${}\r\n{}", value.len(), value),
@@ -65,15 +58,29 @@ pub async fn handle(cmd: Command) -> String {
             );
             resp
         }
+        Command::FLUSHALL => {
+            GLOBAL_STORE.write().unwrap().clear();
+            "+OK".to_string()
+        }
     }
 }
 
-pub async fn handle_and_persist(cmd: Command) -> String {
-    if matches!(
-        cmd,
-        Command::SET { key: _, value: _ } | Command::DEL { key: _ }
-    ) {
-        persist_log(&cmd).await;
+pub async fn handle_on_memory_and_file(cmd: Command) -> String {
+    match &cmd {
+        Command::SET { key: _, value: _ } => {
+            persist_log(&cmd).await;
+        }
+        Command::DEL { key: _ } => {
+            persist_log(&cmd).await;
+        }
+        Command::EXPIRE { key, sec: _ } => {
+            persist_log(&Command::DEL { key: key.clone() }).await;
+        }
+        Command::FLUSHALL => {
+            clear_log_file().await;
+        }
+        Command::GET { key: _ } => {}
+        Command::KEYS { pattern: _ } => {}
     }
-    handle(cmd).await
+    handle_on_memory(cmd).await
 }

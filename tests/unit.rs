@@ -21,12 +21,13 @@ mod base_command_tests {
     use std::{
         io::{Read, Write},
         net::TcpStream,
-        thread,
+        thread::{self, sleep},
         time::Duration,
     };
 
     use ctor::ctor;
     use kvds::app_server::{parser::Command, socket_server::AppServer};
+    use serial_test::serial;
 
     #[ctor]
     fn global_setup() {
@@ -38,80 +39,90 @@ mod base_command_tests {
         thread::sleep(Duration::from_millis(300));
     }
 
+    #[serial]
     #[test]
     fn set_then_get_and_delete() {
-        let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-        // ======================= SET A VALUE ========================
-        let set_cmd = Command::SET {
-            key: "some-key".to_string(),
-            value: "some-value".to_string(),
-        };
-        stream.write_all(set_cmd.to_string().as_bytes()).unwrap();
-        let mut buffer = [0; 512];
-        let n = stream.read(&mut buffer).unwrap();
+        // ======================= SET A VALUE =======================
 
-        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "+OK\r\n");
+        let resp = call_server(Command::cmd_set("some-key", "some-value"));
+        assert_eq!(resp, "+OK\r\n");
 
-        // ====================== GET THE VALUE =====================
-        let get_cmd = Command::GET {
-            key: "some-key".to_string(),
-        };
-        stream.write_all(get_cmd.to_string().as_bytes()).unwrap();
-        let mut buffer: [u8; 512] = [0; 512];
-        let n = stream.read(&mut buffer).unwrap();
+        // ======================= GET THE VALUE =====================
 
-        assert_eq!(
-            String::from_utf8_lossy(&buffer[..n]),
-            "$10\r\nsome-value\r\n"
-        );
+        let resp = call_server(Command::cmd_get("some-key"));
+        assert_eq!(resp, "$10\r\nsome-value\r\n");
 
-        // ====================== DEL THE VALUE =====================
-        let del_cmd = Command::DEL {
-            key: "some-key".to_string(),
-        };
-        stream.write_all(del_cmd.to_string().as_bytes()).unwrap();
-        let mut buffer: [u8; 512] = [0; 512];
-        let n = stream.read(&mut buffer).unwrap();
+        // ======================= DEL THE VALUE =====================
 
-        assert_eq!(String::from_utf8_lossy(&buffer[..n]), ":1\r\n");
+        let resp = call_server(Command::cmd_del("some-key"));
+        assert_eq!(resp, ":1\r\n");
 
-        // ======================= GET NULL =====================
-        let get_cmd = Command::GET {
-            key: "some-key".to_string(),
-        };
-        stream.write_all(get_cmd.to_string().as_bytes()).unwrap();
-        let mut buffer: [u8; 512] = [0; 512];
-        let n = stream.read(&mut buffer).unwrap();
+        // ========================= GET NULL ========================
+       
+        let resp = call_server(Command::cmd_get("some-key"));
+        assert_eq!(resp, "$-1\r\n");
 
-        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "$-1\r\n");
+        flush_all()
     }
 
+    #[serial]
     #[test]
     fn keys_by_pattern() {
-        let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-
         // ======================= SET SOME VALUES ========================
+
         let keys = vec!["key1", "key2", "key3", "key4", "key5"];
         for k in &keys {
-            let set_cmd = Command::SET {
-                key: k.to_string(),
-                value: "some-value".to_string(),
-            };
-            stream.write_all(set_cmd.to_string().as_bytes()).unwrap();
-            let mut buffer: [u8; 512] = [0; 512];
-            stream.read(&mut buffer).unwrap();
+            call_server(Command::cmd_set(k, "some-value"));
         }
 
         // ==================== GET KEYS BY PATTERN =======================
-        let cmd_keys = Command::cmd_keys("*");
-        stream.write_all(cmd_keys.to_string().as_bytes()).unwrap();
+
+        let mut result = Command::cmd_to_list(call_server(Command::cmd_keys("*"))).unwrap();
+        result.sort();
+        assert_eq!(keys, result);
+        
+        flush_all()
+    }
+
+    #[serial]
+    #[test]
+    fn expire_time_for_a_key() {
+        // ======================= SET A KEY WITH EXPIRATION ========================
+
+        let resp = call_server(Command::cmd_set("some-key", "some-value"));
+        assert_eq!(resp, "+OK\r\n");
+
+        // ============================ EXPIRATION ==================================
+
+        let resp = call_server(Command::cmd_expire("some-key", 1));
+        assert_eq!(resp, ":1\r\n");
+        // ======
+        let resp = call_server(Command::cmd_get("some-key"));
+        assert_eq!(resp, "$10\r\nsome-value\r\n");
+
+        // =================== GET THE VALUE AFTER A SECOND =========================
+
+        sleep(Duration::from_secs(1));
+        let resp = call_server(Command::cmd_get("some-key"));
+        assert_eq!(resp, "$-1\r\n");
+    }
+
+    fn call_server(cmd: Command) -> String {
+        let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
+        stream.write_all(cmd.to_string().as_bytes()).unwrap();
         let mut buffer: [u8; 512] = [0; 512];
         let n = stream.read(&mut buffer).unwrap();
-        let mut result =
-            Command::cmd_to_list(String::from_utf8_lossy(&buffer[..n]).to_string()).unwrap();
+        String::from_utf8_lossy(&buffer[..n]).to_string()
+    }
 
-        result.sort();
+    fn flush_all() {
+        let mut stream: TcpStream = TcpStream::connect("127.0.0.1:7878").unwrap();
+        stream
+            .write_all(Command::FLUSHALL.to_string().as_bytes())
+            .unwrap();
+        let mut buffer: [u8; 512] = [0; 512];
+        let n = stream.read(&mut buffer).unwrap();
 
-        assert_eq!(keys, result);
+        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "+OK\r\n");
     }
 }
