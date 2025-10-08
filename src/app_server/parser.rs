@@ -7,6 +7,7 @@ pub enum Command {
     SET { key: String, value: String },
     DEL { key: String },
     KEYS { pattern: String },
+    EXPIRE { key: String, sec: u64 },
 }
 
 impl Command {
@@ -51,38 +52,44 @@ impl ToString for Command {
             Self::KEYS { pattern } => {
                 format!("*2\r\n$4\r\nKEYS\r\n${}\r\n{}\r\n", pattern.len(), pattern)
             }
+            Self::EXPIRE { key, sec } => format!(
+                "*3\r\n$6\r\nEXPIRE\r\n${}\r\n{}\r\n${}\r\n{}\r\n",
+                key.len(),
+                key,
+                sec.to_string().len(),
+                sec
+            ),
         }
     }
 }
 
 // '*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$4\r\value\r\n'
-pub fn parse_command(mut cmd_seq: Chars<'_>) -> Result<Command, Error> {
-    if !is_char('*', &mut cmd_seq) {
-        return Err(Error);
-    }
-
-    match extract_number(&mut cmd_seq) {
-        2 => {
-            let (cmd, key) = extract_cmd_key(&mut cmd_seq).ok_or(Error)?;
-            match cmd.as_str() {
-                "GET" => return Ok(Command::GET { key: key }),
-                "DEL" => return Ok(Command::DEL { key: key }),
-                "KEYS" => return Ok(Command::KEYS { pattern: key }),
-                _ => return Err(Error),
-            }
+pub fn parse_command(cmd: String) -> Result<Command, Error> {
+    let mut cmd_parts = Command::cmd_to_list(cmd)?.into_iter();
+    match cmd_parts.next().ok_or(Error)?.as_str() {
+        "GET" => {
+            let key = cmd_parts.next().ok_or(Error)?;
+            Ok(Command::GET { key })
         }
-        3 => {
-            let (cmd, key) = extract_cmd_key(&mut cmd_seq).ok_or(Error)?;
-            if cmd.as_str() != "SET" {
-                return Err(Error);
-            }
-            let value: String = extract_value(&mut cmd_seq).ok_or(Error)?;
-            Ok(Command::SET {
-                key: key,
-                value: value,
-            })
+        "DEL" => {
+            let key = cmd_parts.next().ok_or(Error)?;
+            Ok(Command::DEL { key })
         }
-        _ => return Err(Error),
+        "SET" => {
+            let key = cmd_parts.next().ok_or(Error)?;
+            let value = cmd_parts.next().ok_or(Error)?;
+            Ok(Command::SET { key, value })
+        }
+        "KEYS" => {
+            let pattern = cmd_parts.next().ok_or(Error)?;
+            Ok(Command::KEYS { pattern })
+        }
+        "EXPIRE" => {
+            let key = cmd_parts.next().ok_or(Error)?;
+            let sec = cmd_parts.next().ok_or(Error)?.parse().unwrap();
+            Ok(Command::EXPIRE { key, sec })
+        }
+        _ => Err(Error),
     }
 }
 
@@ -109,45 +116,4 @@ fn skip_new_line(cmd: &mut Chars<'_>) -> bool {
 
 fn extract_string(n: usize, cmd: &mut Chars<'_>) -> String {
     cmd.take(n).collect::<String>()
-}
-
-fn extract_cmd_key(chars: &mut Chars<'_>) -> Option<(String, String)> {
-    if !skip_new_line(chars) {
-        return None;
-    }
-    if !is_char('$', chars) {
-        return None;
-    }
-    let cmd_len = extract_number(chars);
-    if !skip_new_line(chars) {
-        return None;
-    }
-    let cmd = extract_string(cmd_len, chars);
-    if !skip_new_line(chars) {
-        return None;
-    }
-    if !is_char('$', chars) {
-        return None;
-    }
-    let key_len = extract_number(chars);
-    if !skip_new_line(chars) {
-        return None;
-    }
-    let key = extract_string(key_len, chars);
-    Some((cmd, key))
-}
-
-fn extract_value(chars: &mut Chars<'_>) -> Option<String> {
-    if !skip_new_line(chars) {
-        return None;
-    }
-    if !is_char('$', chars) {
-        return None;
-    }
-    let value_len = extract_number(chars);
-    if !skip_new_line(chars) {
-        return None;
-    }
-    let value = extract_string(value_len, chars);
-    Some(value)
 }
