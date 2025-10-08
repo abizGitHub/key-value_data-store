@@ -1,10 +1,12 @@
 use crate::app_server::parser::Command;
 use crate::services::persistence_service::persist_log;
+use crate::services::timer_service::do_after_delay;
 
 use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::RwLock;
+use std::time::Duration;
 
 static GLOBAL_STORE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -50,5 +52,28 @@ pub async fn handle(cmd: Command) -> String {
                     acc
                 })
         }
+        Command::EXPIRE { key, sec } => {
+            let resp = match GLOBAL_STORE.write().unwrap().get(&key) {
+                Some(_) => ":1".to_string(),
+                None => ":0".to_string(),
+            };
+            do_after_delay(
+                move || {
+                    GLOBAL_STORE.write().unwrap().remove(&key);
+                },
+                Duration::from_secs(sec),
+            );
+            resp
+        }
     }
+}
+
+pub async fn handle_and_persist(cmd: Command) -> String {
+    if matches!(
+        cmd,
+        Command::SET { key: _, value: _ } | Command::DEL { key: _ }
+    ) {
+        persist_log(&cmd).await;
+    }
+    handle(cmd).await
 }

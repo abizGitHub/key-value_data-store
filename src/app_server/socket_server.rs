@@ -2,7 +2,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::app_server::parser::parse_command;
-use crate::services::command_handler::handle;
+use crate::services::command_handler::handle_and_persist;
 use crate::services::persistence_service;
 
 pub struct AppServer {
@@ -46,9 +46,9 @@ async fn handle_client(mut socket: TcpStream) {
             }
             Ok(n) => {
                 let received = String::from_utf8_lossy(&buf[..n]).into_owned();
-                let cmd = parse_command(received.chars());
+                let cmd = parse_command(received);
                 let mut resp = match cmd {
-                    Ok(req) => handle(req).await,
+                    Ok(req) => handle_and_persist(req).await,
                     Err(e) => format!("-ERR unknown command: {e}"),
                 };
                 resp.push_str("\r\n");

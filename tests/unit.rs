@@ -4,11 +4,8 @@ mod tests {
 
     #[test]
     fn parse_get_command() {
-        let cmd = parse_command(
-            "*3\r\n$3\r\nSET\r\n$8\r\nsome-key\r\n$10\r\nsome-value\r\n"
-                .to_string()
-                .chars(),
-        );
+        let cmd =
+            parse_command("*3\r\n$3\r\nSET\r\n$8\r\nsome-key\r\n$10\r\nsome-value\r\n".to_string());
         assert_eq!(
             cmd.unwrap(),
             Command::SET {
@@ -112,7 +109,7 @@ mod base_command_tests {
         let n = stream.read(&mut buffer).unwrap();
         let mut result =
             Command::cmd_to_list(String::from_utf8_lossy(&buffer[..n]).to_string()).unwrap();
-        
+
         result.sort();
 
         assert_eq!(keys, result);

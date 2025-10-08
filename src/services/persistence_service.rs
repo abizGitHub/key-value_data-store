@@ -46,8 +46,7 @@ pub async fn load_data() {
         .expect("error opening db file!");
 
     for row in stored_data.lines() {
-        let cmd =
-            parse_command(row.replace("\\r\\n", "\r\n").chars()).expect("error reading db rows!");
+        let cmd = parse_command(row.replace("\\r\\n", "\r\n")).expect("error reading db rows!");
         handle(cmd).await;
     }
 }
