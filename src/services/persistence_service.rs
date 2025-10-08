@@ -1,5 +1,5 @@
 use crate::app_server::parser::{parse_command, Command};
-use crate::services::command_handler::handle;
+use crate::services::command_handler::handle_on_memory;
 use crate::SETTING;
 use once_cell::sync::Lazy;
 use std::io::{Read, Write};
@@ -47,6 +47,16 @@ pub async fn load_data() {
 
     for row in stored_data.lines() {
         let cmd = parse_command(row.replace("\\r\\n", "\r\n")).expect("error reading db rows!");
-        handle(cmd).await;
+        handle_on_memory(cmd).await;
     }
+}
+
+pub async fn clear_log_file() {
+    OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(SETTING.db_file.clone())
+        .expect("error in read or create DB file!");
+
+    let _ = DB_FILE.write().unwrap().sync_data();
 }
