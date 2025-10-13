@@ -13,6 +13,7 @@ static GLOBAL_STORE: Lazy<RwLock<HashMap<String, String>>> =
 
 pub async fn handle_on_memory(cmd: Command) -> String {
     match cmd {
+        Command::PING => "+PONG".to_string(),
         Command::GET { key } => match GLOBAL_STORE.read().unwrap().get(&key) {
             Some(value) => format!("${}\r\n{}", value.len(), value),
             None => "$-1".to_string(),
@@ -67,6 +68,7 @@ pub async fn handle_on_memory(cmd: Command) -> String {
 
 pub async fn handle_on_memory_and_file(cmd: Command) -> String {
     match &cmd {
+        Command::PING => {}
         Command::SET { key: _, value: _ } => {
             persist_log(&cmd).await;
         }

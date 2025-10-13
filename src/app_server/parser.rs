@@ -3,6 +3,7 @@ use std::str::Chars;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
+    PING,
     GET { key: String },
     SET { key: String, value: String },
     DEL { key: String },
@@ -63,6 +64,7 @@ impl Command {
 impl ToString for Command {
     fn to_string(&self) -> String {
         match self {
+            Self::PING => "*1\r\n$4\r\nPING\r\n".to_string(),
             Self::GET { key } => format!("*2\r\n$3\r\nGET\r\n${}\r\n{}\r\n", key.len(), key),
             Self::DEL { key } => format!("*2\r\n$3\r\nDEL\r\n${}\r\n{}\r\n", key.len(), key),
             Self::SET { key, value } => format!(
@@ -91,6 +93,7 @@ impl ToString for Command {
 pub fn parse_command(cmd: String) -> Result<Command, Error> {
     let mut cmd_parts = Command::cmd_to_list(cmd)?.into_iter();
     match cmd_parts.next().ok_or(Error)?.as_str() {
+        "PING" => Ok(Command::PING),
         "GET" => {
             let key = cmd_parts.next().ok_or(Error)?;
             Ok(Command::GET { key })

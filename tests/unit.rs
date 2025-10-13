@@ -116,13 +116,7 @@ mod base_command_tests {
     }
 
     fn flush_all() {
-        let mut stream: TcpStream = TcpStream::connect("127.0.0.1:7878").unwrap();
-        stream
-            .write_all(Command::FLUSHALL.to_string().as_bytes())
-            .unwrap();
-        let mut buffer: [u8; 512] = [0; 512];
-        let n = stream.read(&mut buffer).unwrap();
-
-        assert_eq!(String::from_utf8_lossy(&buffer[..n]), "+OK\r\n");
+        let resp = call_server(Command::FLUSHALL);
+        assert_eq!(resp, "+OK\r\n");
     }
 }
