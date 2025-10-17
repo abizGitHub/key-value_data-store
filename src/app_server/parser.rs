@@ -10,6 +10,7 @@ pub enum Command {
     KEYS { pattern: String },
     EXPIRE { key: String, sec: u64 },
     FLUSHALL,
+    TTL { key: String },
 }
 
 impl Command {
@@ -26,6 +27,11 @@ impl Command {
     }
     pub fn cmd_del(key: &str) -> Self {
         Self::DEL {
+            key: key.to_string(),
+        }
+    }
+    pub fn cmd_ttl(key: &str) -> Self {
+        Self::TTL {
             key: key.to_string(),
         }
     }
@@ -85,6 +91,7 @@ impl ToString for Command {
                 sec
             ),
             Self::FLUSHALL => "*1\r\n$8\r\nFLUSHALL\r\n".to_string(),
+            Self::TTL { key } => format!("*2\r\n$3\r\nTTL\r\n${}\r\n{}\r\n", key.len(), key),
         }
     }
 }
@@ -117,6 +124,10 @@ pub fn parse_command(cmd: String) -> Result<Command, Error> {
             Ok(Command::EXPIRE { key, sec })
         }
         "FLUSHALL" => Ok(Command::FLUSHALL),
+        "TTL" => {
+            let key = cmd_parts.next().ok_or(Error)?;
+            Ok(Command::TTL { key })
+        }
         _ => Err(Error),
     }
 }
