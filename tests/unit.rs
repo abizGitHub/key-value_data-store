@@ -102,8 +102,31 @@ mod base_command_tests {
 
         // =================== GET THE VALUE AFTER A SECOND =========================
 
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_millis(1_001));
         let resp = call_server(Command::cmd_get("some-key"));
+        assert_eq!(resp, "$-1\r\n");
+    }
+
+    #[serial]
+    #[test]
+    fn ttl_for_a_key() {
+        // ======================= SET A KEY WITH EXPIRATION ========================
+
+        let resp = call_server(Command::cmd_set("a-key", "some-value"));
+        assert_eq!(resp, "+OK\r\n");
+
+        // ============================ EXPIRATION ==================================
+
+        let resp = call_server(Command::cmd_expire("a-key", 2));
+        assert_eq!(resp, ":1\r\n");
+        // ======
+        let resp = call_server(Command::cmd_ttl("a-key"));
+        assert_eq!(resp, ":1\r\n");
+
+        // =================== GET THE VALUE AFTER A SECOND =========================
+
+        sleep(Duration::from_millis(2_001));
+        let resp = call_server(Command::cmd_get("a-key"));
         assert_eq!(resp, "$-1\r\n");
     }
 

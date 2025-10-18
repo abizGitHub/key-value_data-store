@@ -88,7 +88,7 @@ pub async fn handle_on_memory(cmd: Command) -> String {
                         .as_secs()
                         .to_string();
 
-                    format!("${}\r\n", sec)
+                    format!(":{}", sec)
                 }
                 None => ":-1".to_string(),
             },
