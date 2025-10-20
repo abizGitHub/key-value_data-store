@@ -1,5 +1,7 @@
 pub mod app_server;
+pub mod connector;
 pub mod services;
+
 use config::{Config, ConfigError, Environment, File};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
