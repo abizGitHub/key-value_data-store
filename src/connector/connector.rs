@@ -39,13 +39,11 @@ impl Connector {
         self
     }
 
-    pub fn get(self: &Self, key: &str) -> String {
-        self.call_server(Command::cmd_get(key))
-            .split("\r\n")
-            .skip(1)
-            .next()
-            .unwrap()
-            .to_string()
+    pub fn get(self: &Self, key: &str) -> Option<String> {
+        match self.call_server(Command::cmd_get(key)).as_str() {
+            "$-1\r\n" => None,
+            value => Some(value.split("\r\n").skip(1).next().unwrap().to_string()),
+        }
     }
 
     pub fn insert(self: &Self, key: &str, value: &str) {

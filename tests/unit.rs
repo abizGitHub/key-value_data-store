@@ -157,7 +157,7 @@ mod connector_tests {
         thread::spawn(|| {
             tokio::runtime::Runtime::new()
                 .unwrap()
-                .block_on(async { AppServer::new("7878").start().await });
+                .block_on(async { AppServer::new("7879").start().await });
         });
         thread::sleep(Duration::from_millis(300));
     }
@@ -165,7 +165,7 @@ mod connector_tests {
     #[test]
     fn test_connector() {
         // ======================= SET SOME VALUES ========================
-        let c = Connector::with_port("7878");
+        let c = Connector::with_port("7879");
 
         let keys = vec!["key1", "key2", "key3", "key4", "key5"];
         for k in &keys {
@@ -179,7 +179,10 @@ mod connector_tests {
         assert_eq!(keys, result);
 
         let value = c.get("key1");
-        assert_eq!(value, "some-value");
+        assert_eq!(value, Some("some-value".to_string()));
+
+        let value = c.get("unknown");
+        assert_eq!(value, None);
 
         flush_all()
     }
