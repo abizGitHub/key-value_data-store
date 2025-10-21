@@ -113,6 +113,8 @@ mod base_command_tests {
         sleep(Duration::from_millis(1_001));
         let resp = c.call_server(Command::cmd_get("some-key"));
         assert_eq!(resp, "$-1\r\n");
+
+        flush_all()
     }
 
     #[serial]
@@ -137,14 +139,28 @@ mod base_command_tests {
         sleep(Duration::from_millis(2_001));
         let resp = c.call_server(Command::cmd_get("a-key"));
         assert_eq!(resp, "$-1\r\n");
+
+        flush_all()
     }
 }
 
-#[cfg(test)]
 mod connector_tests {
-    use kvds::connector::connector::Connector;
+    use std::{thread, time::Duration};
+
+    use kvds::{app_server::socket_server::AppServer, connector::connector::Connector};
 
     use crate::flush_all;
+    use ctor::ctor;
+
+    #[ctor]
+    fn global_setup() {
+        thread::spawn(|| {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(async { AppServer::new("7878").start().await });
+        });
+        thread::sleep(Duration::from_millis(300));
+    }
 
     #[test]
     fn test_connector() {
@@ -161,6 +177,9 @@ mod connector_tests {
         let mut result = c.keys("*");
         result.sort();
         assert_eq!(keys, result);
+
+        let value = c.get("key1");
+        assert_eq!(value, "some-value");
 
         flush_all()
     }

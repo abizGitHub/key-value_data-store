@@ -41,6 +41,11 @@ impl Connector {
 
     pub fn get(self: &Self, key: &str) -> String {
         self.call_server(Command::cmd_get(key))
+            .split("\r\n")
+            .skip(1)
+            .next()
+            .unwrap()
+            .to_string()
     }
 
     pub fn insert(self: &Self, key: &str, value: &str) {
