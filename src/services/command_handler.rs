@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{Duration, SystemTime};
 
+pub static PERSIST: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
+
 static GLOBAL_STORE: Lazy<RwLock<HashMap<String, StoredData>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -98,23 +100,25 @@ pub async fn handle_on_memory(cmd: Command) -> String {
 }
 
 pub async fn handle_on_memory_and_file(cmd: Command) -> String {
-    match &cmd {
-        Command::PING => {}
-        Command::SET { key: _, value: _ } => {
-            persist_log(&cmd).await;
+    if *PERSIST.read().unwrap() {
+        match &cmd {
+            Command::PING => {}
+            Command::SET { key: _, value: _ } => {
+                persist_log(&cmd).await;
+            }
+            Command::DEL { key: _ } => {
+                persist_log(&cmd).await;
+            }
+            Command::EXPIRE { key, sec: _ } => {
+                persist_log(&Command::DEL { key: key.clone() }).await;
+            }
+            Command::FLUSHALL => {
+                clear_log_file().await;
+            }
+            Command::GET { key: _ } => {}
+            Command::KEYS { pattern: _ } => {}
+            Command::TTL { key: _ } => {}
         }
-        Command::DEL { key: _ } => {
-            persist_log(&cmd).await;
-        }
-        Command::EXPIRE { key, sec: _ } => {
-            persist_log(&Command::DEL { key: key.clone() }).await;
-        }
-        Command::FLUSHALL => {
-            clear_log_file().await;
-        }
-        Command::GET { key: _ } => {}
-        Command::KEYS { pattern: _ } => {}
-        Command::TTL { key: _ } => {}
     }
     handle_on_memory(cmd).await
 }

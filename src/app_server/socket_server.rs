@@ -2,7 +2,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::app_server::parser::parse_command;
-use crate::services::command_handler::handle_on_memory_and_file;
+use crate::services::command_handler::{handle_on_memory_and_file, PERSIST};
 use crate::services::persistence_service;
 
 pub struct AppServer {
@@ -10,7 +10,8 @@ pub struct AppServer {
 }
 
 impl AppServer {
-    pub fn new(port: &str) -> Self {
+    pub fn new(port: &str, persist: bool) -> Self {
+        *PERSIST.write().unwrap() = persist;
         AppServer {
             port: port.to_string(),
         }

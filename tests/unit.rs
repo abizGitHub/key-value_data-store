@@ -39,7 +39,7 @@ mod base_command_tests {
         thread::spawn(|| {
             tokio::runtime::Runtime::new()
                 .unwrap()
-                .block_on(async { AppServer::new("7878").start().await });
+                .block_on(async { AppServer::new("7878", false).start().await });
         });
         thread::sleep(Duration::from_millis(300));
     }
@@ -148,6 +148,7 @@ mod connector_tests {
     use std::{thread, time::Duration};
 
     use kvds::{app_server::socket_server::AppServer, connector::connector::Connector};
+    use serial_test::serial;
 
     use crate::flush_all;
     use ctor::ctor;
@@ -157,11 +158,12 @@ mod connector_tests {
         thread::spawn(|| {
             tokio::runtime::Runtime::new()
                 .unwrap()
-                .block_on(async { AppServer::new("7879").start().await });
+                .block_on(async { AppServer::new("7879", false).start().await });
         });
         thread::sleep(Duration::from_millis(300));
     }
 
+    #[serial]
     #[test]
     fn test_connector() {
         // ======================= SET SOME VALUES ========================

@@ -4,6 +4,7 @@ use std::{
     net::TcpStream,
 };
 
+#[derive(Debug)]
 pub struct Connector {
     url: String,
     stream: Option<TcpStream>,
