@@ -136,7 +136,7 @@ fn is_char(c: char, cmd: &mut Chars<'_>) -> bool {
     cmd.next() == Some(c)
 }
 
-fn extract_number(cmd: &mut Chars<'_>) -> usize {
+pub fn extract_number(cmd: &mut Chars<'_>) -> usize {
     let mut v = Vec::new();
     loop {
         let c = cmd.next().unwrap();
@@ -149,10 +149,10 @@ fn extract_number(cmd: &mut Chars<'_>) -> usize {
     v.iter().collect::<String>().parse().unwrap()
 }
 
-fn skip_new_line(cmd: &mut Chars<'_>) -> bool {
+pub fn skip_new_line(cmd: &mut Chars<'_>) -> bool {
     cmd.next() == Some('\n') || cmd.next() == Some('\n')
 }
 
-fn extract_string(n: usize, cmd: &mut Chars<'_>) -> String {
+pub fn extract_string(n: usize, cmd: &mut Chars<'_>) -> String {
     cmd.take(n).collect::<String>()
 }

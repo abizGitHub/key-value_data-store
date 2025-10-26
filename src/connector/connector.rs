@@ -1,4 +1,4 @@
-use crate::app_server::parser::Command;
+use crate::app_server::parser::{extract_number, extract_string, skip_new_line, Command};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -43,7 +43,12 @@ impl Connector {
     pub fn get(self: &Self, key: &str) -> Option<String> {
         match self.call_server(Command::cmd_get(key)).as_str() {
             "$-1\r\n" => None,
-            value => Some(value.split("\r\n").skip(1).next().unwrap().to_string()),
+            value => {
+                let mut chars = value.chars();
+                let len = extract_number(&mut chars);
+                skip_new_line(&mut chars);
+                Some(extract_string(len, &mut chars))
+            }
         }
     }
 
@@ -61,7 +66,7 @@ impl Connector {
             .unwrap()
             .write_all(cmd.to_string().as_bytes())
             .unwrap();
-        let mut buffer: [u8; 512] = [0; 512];
+        let mut buffer: [u8; 4096] = [0; 4096];
         let n = self.stream.as_ref().unwrap().read(&mut buffer).unwrap();
         String::from_utf8_lossy(&buffer[..n]).to_string()
     }
