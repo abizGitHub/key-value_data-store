@@ -132,7 +132,7 @@ pub fn parse_command(cmd: String) -> Result<Command, Error> {
     }
 }
 
-fn is_char(c: char, cmd: &mut Chars<'_>) -> bool {
+pub fn is_char(c: char, cmd: &mut Chars<'_>) -> bool {
     cmd.next() == Some(c)
 }
 

@@ -1,4 +1,4 @@
-use crate::app_server::parser::{extract_number, extract_string, skip_new_line, Command};
+use crate::app_server::parser::{extract_number, extract_string, is_char, skip_new_line, Command};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -45,6 +45,9 @@ impl Connector {
             "$-1\r\n" => None,
             value => {
                 let mut chars = value.chars();
+                if !is_char('$', &mut chars) {
+                    return None;
+                };
                 let len = extract_number(&mut chars);
                 skip_new_line(&mut chars);
                 Some(extract_string(len, &mut chars))
