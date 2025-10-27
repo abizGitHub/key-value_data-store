@@ -12,6 +12,9 @@ pub struct AppServer {
 impl AppServer {
     pub fn new(port: &str, persist: bool) -> Self {
         *PERSIST.write().unwrap() = persist;
+        if persist {
+            println!("----< local persistence enabled >----")
+        }
         AppServer {
             port: port.to_string(),
         }
@@ -22,7 +25,6 @@ impl AppServer {
         let url = format!("127.0.0.1:{}", self.port);
         let listener = TcpListener::bind(&url).await?;
         println!("Async server running on {url}");
-
         loop {
             match listener.accept().await {
                 Ok((socket, _)) => {
