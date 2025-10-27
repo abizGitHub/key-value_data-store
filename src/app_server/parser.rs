@@ -48,17 +48,11 @@ impl Command {
     }
     pub fn cmd_to_list(cmd: String) -> Result<Vec<String>, Error> {
         let mut cmd_seq = cmd.chars();
-        if !is_char('*', &mut cmd_seq) {
-            return Err(Error);
-        }
-        let n = extract_number(&mut cmd_seq);
+        let n = extract_number('*', &mut cmd_seq).ok_or(Error)?;
         skip_new_line(&mut cmd_seq);
         let mut result = Vec::new();
         for _ in 0..n {
-            if !is_char('$', &mut cmd_seq) {
-                return Err(Error);
-            }
-            let len = extract_number(&mut cmd_seq);
+            let len = extract_number('$', &mut cmd_seq).ok_or(Error)?;
             skip_new_line(&mut cmd_seq);
             result.push(extract_string(len, &mut cmd_seq));
             skip_new_line(&mut cmd_seq);
@@ -132,11 +126,10 @@ pub fn parse_command(cmd: String) -> Result<Command, Error> {
     }
 }
 
-pub fn is_char(c: char, cmd: &mut Chars<'_>) -> bool {
-    cmd.next() == Some(c)
-}
-
-pub fn extract_number(cmd: &mut Chars<'_>) -> usize {
+pub fn extract_number(starter: char, cmd: &mut Chars<'_>) -> Option<usize> {
+    if cmd.next() != Some(starter) {
+        return None;
+    }
     let mut v = Vec::new();
     loop {
         let c = cmd.next().unwrap();
@@ -146,7 +139,7 @@ pub fn extract_number(cmd: &mut Chars<'_>) -> usize {
             break;
         }
     }
-    v.iter().collect::<String>().parse().unwrap()
+    Some(v.iter().collect::<String>().parse().unwrap())
 }
 
 pub fn skip_new_line(cmd: &mut Chars<'_>) -> bool {
