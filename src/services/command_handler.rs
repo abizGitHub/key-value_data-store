@@ -96,28 +96,73 @@ pub async fn handle_on_memory(cmd: Command) -> String {
             },
             None => ":-2".to_string(),
         },
+        Command::INCR { key } => {
+            let inc = {
+                match GLOBAL_STORE.read().unwrap().get(&key) {
+                    Some(stored) => match str::parse::<isize>(&stored.value) {
+                        Ok(i) => Ok(i + 1),
+                        Err(_) => Err(()),
+                    },
+                    None => Ok(1),
+                }
+            };
+            match inc {
+                Ok(i) => {
+                    GLOBAL_STORE
+                        .write()
+                        .unwrap()
+                        .insert(key, StoredData::new(i.to_string()));
+                    format!(":{i}")
+                }
+                Err(_) => "-ERR value is not an integer or out of range".to_string(),
+            }
+        }
+        Command::DECR { key } => {
+            let dec = {
+                match GLOBAL_STORE.read().unwrap().get(&key) {
+                    Some(stored) => match str::parse::<isize>(&stored.value) {
+                        Ok(i) => Ok(i - 1),
+                        Err(_) => Err(()),
+                    },
+                    None => Ok(-1),
+                }
+            };
+            match dec {
+                Ok(i) => {
+                    GLOBAL_STORE
+                        .write()
+                        .unwrap()
+                        .insert(key, StoredData::new(i.to_string()));
+                    format!(":{i}")
+                }
+                Err(_) => "-ERR value is not an integer or out of range".to_string(),
+            }
+        }
     }
 }
 
 pub async fn handle_on_memory_and_file(cmd: Command) -> String {
     if *PERSIST.read().unwrap() {
         match &cmd {
-            Command::PING => {}
-            Command::SET { key: _, value: _ } => {
+            Command::PING {}
+            | Command::GET { key: _ }
+            | Command::KEYS { pattern: _ }
+            | Command::TTL { key: _ } => {}
+
+            Command::INCR { key: _ }
+            | Command::DECR { key: _ }
+            | Command::DEL { key: _ }
+            | Command::SET { key: _, value: _ } => {
                 persist_log(&cmd).await;
             }
-            Command::DEL { key: _ } => {
-                persist_log(&cmd).await;
-            }
+
             Command::EXPIRE { key, sec: _ } => {
                 persist_log(&Command::DEL { key: key.clone() }).await;
             }
+
             Command::FLUSHALL => {
                 clear_log_file().await;
             }
-            Command::GET { key: _ } => {}
-            Command::KEYS { pattern: _ } => {}
-            Command::TTL { key: _ } => {}
         }
     }
     handle_on_memory(cmd).await

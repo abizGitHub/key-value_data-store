@@ -11,6 +11,8 @@ pub enum Command {
     EXPIRE { key: String, sec: u64 },
     FLUSHALL,
     TTL { key: String },
+    INCR { key: String },
+    DECR { key: String },
 }
 
 impl Command {
@@ -44,6 +46,16 @@ impl Command {
     pub fn cmd_keys(pat: &str) -> Self {
         Self::KEYS {
             pattern: pat.to_string(),
+        }
+    }
+    pub fn cmd_incr(key: &str) -> Self {
+        Self::INCR {
+            key: key.to_string(),
+        }
+    }
+    pub fn cmd_decr(key: &str) -> Self {
+        Self::DECR {
+            key: key.to_string(),
         }
     }
     pub fn cmd_to_list(cmd: String) -> Result<Vec<String>, Error> {
@@ -86,6 +98,8 @@ impl ToString for Command {
             ),
             Self::FLUSHALL => "*1\r\n$8\r\nFLUSHALL\r\n".to_string(),
             Self::TTL { key } => format!("*2\r\n$3\r\nTTL\r\n${}\r\n{}\r\n", key.len(), key),
+            Self::INCR { key } => format!("*2\r\n$4\r\nINCR\r\n${}\r\n{}\r\n", key.len(), key),
+            Self::DECR { key } => format!("*2\r\n$4\r\nDECR\r\n${}\r\n{}\r\n", key.len(), key),
         }
     }
 }
@@ -118,10 +132,15 @@ pub fn parse_command(cmd: String) -> Result<Command, Error> {
             Ok(Command::EXPIRE { key, sec })
         }
         "FLUSHALL" => Ok(Command::FLUSHALL),
-        "TTL" => {
-            let key = cmd_parts.next().ok_or(Error)?;
-            Ok(Command::TTL { key })
-        }
+        "TTL" => Ok(Command::TTL {
+            key: cmd_parts.next().ok_or(Error)?,
+        }),
+        "INCR" => Ok(Command::INCR {
+            key: cmd_parts.next().ok_or(Error)?,
+        }),
+        "DECR" => Ok(Command::DECR {
+            key: cmd_parts.next().ok_or(Error)?,
+        }),
         _ => Err(Error),
     }
 }
