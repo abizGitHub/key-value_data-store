@@ -142,6 +142,36 @@ mod base_command_tests {
 
         flush_all()
     }
+
+    #[serial]
+    #[test]
+    fn incre_and_decr() {
+        let c = Connector::with_port("7878");
+        // ======================= SET A KEY ========================
+        let resp = c.call_server(Command::cmd_set("a-key", "100"));
+        assert_eq!(resp, "+OK\r\n");
+
+        // =================== INCR AND DECR ========================
+        for i in 1..11 {
+            let resp = c.call_server(Command::cmd_incr("a-key"));
+            assert_eq!(resp, format!(":{}\r\n", i + 100));
+        }
+        // ======
+        let resp = c.call_server(Command::cmd_get("a-key"));
+        assert_eq!(resp, "$3\r\n110\r\n");
+
+        let resp = c.call_server(Command::cmd_decr("a-key"));
+        assert_eq!(resp, ":109\r\n");
+        
+        // =================== GET EXCEPTION =========================
+        let resp = c.call_server(Command::cmd_set("a-key", "not-number"));
+        assert_eq!(resp, "+OK\r\n");
+
+        let resp = c.call_server(Command::cmd_decr("a-key"));
+        assert_eq!(resp, "-ERR value is not an integer or out of range\r\n");
+        
+        flush_all()
+    }
 }
 
 mod connector_tests {
