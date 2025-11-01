@@ -5,12 +5,16 @@ use crate::services::timer_service::do_after_delay;
 use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::RwLock;
 use std::time::{Duration, SystemTime};
 
 pub static PERSIST: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
 
 static GLOBAL_STORE: Lazy<RwLock<HashMap<String, StoredData>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+static GLOBAL_NUMBERS: Lazy<RwLock<HashMap<String, AtomicIsize>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 struct StoredData {
@@ -27,11 +31,24 @@ impl StoredData {
 }
 
 pub async fn handle_on_memory(cmd: Command) -> String {
+    let already_in_map = |key| match GLOBAL_STORE.write().unwrap().remove(key) {
+        Some(stored) => match str::parse::<isize>(&stored.value) {
+            Ok(i) => Ok(i),
+            Err(_) => Err(()),
+        },
+        None => Ok(0),
+    };
     match cmd {
         Command::PING => "+PONG".to_string(),
         Command::GET { key } => match GLOBAL_STORE.read().unwrap().get(&key) {
             Some(stored) => format!("${}\r\n{}", stored.value.len(), stored.value),
-            None => "$-1".to_string(),
+            None => match GLOBAL_NUMBERS.read().unwrap().get(&key) {
+                Some(i) => {
+                    let x = i.load(Ordering::SeqCst);
+                    format!("${}\r\n{}", x.to_string().len(), x)
+                }
+                None => "$-1".to_string(),
+            },
         },
         Command::DEL { key } => match GLOBAL_STORE.write().unwrap().remove(&key) {
             Some(_) => ":1".to_string(),
@@ -79,6 +96,7 @@ pub async fn handle_on_memory(cmd: Command) -> String {
         },
         Command::FLUSHALL => {
             GLOBAL_STORE.write().unwrap().clear();
+            GLOBAL_NUMBERS.write().unwrap().clear();
             "+OK".to_string()
         }
         Command::TTL { key } => match GLOBAL_STORE.read().unwrap().get(&key) {
@@ -96,48 +114,24 @@ pub async fn handle_on_memory(cmd: Command) -> String {
             },
             None => ":-2".to_string(),
         },
-        Command::INCR { key } => {
-            let inc = {
-                match GLOBAL_STORE.read().unwrap().get(&key) {
-                    Some(stored) => match str::parse::<isize>(&stored.value) {
-                        Ok(i) => Ok(i + 1),
-                        Err(_) => Err(()),
-                    },
-                    None => Ok(1),
-                }
-            };
-            match inc {
-                Ok(i) => {
-                    GLOBAL_STORE
-                        .write()
-                        .unwrap()
-                        .insert(key, StoredData::new(i.to_string()));
-                    format!(":{i}")
-                }
-                Err(_) => "-ERR value is not an integer or out of range".to_string(),
+        Command::INCR { key } => match already_in_map(&key) {
+            Ok(i) => {
+                let mut map = GLOBAL_NUMBERS.write().unwrap();
+                let counter = map.entry(key).or_insert_with(|| AtomicIsize::new(i));
+                let new_value = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                format!(":{new_value}")
             }
-        }
-        Command::DECR { key } => {
-            let dec = {
-                match GLOBAL_STORE.read().unwrap().get(&key) {
-                    Some(stored) => match str::parse::<isize>(&stored.value) {
-                        Ok(i) => Ok(i - 1),
-                        Err(_) => Err(()),
-                    },
-                    None => Ok(-1),
-                }
-            };
-            match dec {
-                Ok(i) => {
-                    GLOBAL_STORE
-                        .write()
-                        .unwrap()
-                        .insert(key, StoredData::new(i.to_string()));
-                    format!(":{i}")
-                }
-                Err(_) => "-ERR value is not an integer or out of range".to_string(),
+            Err(_) => "-ERR value is not an integer or out of range".to_string(),
+        },
+        Command::DECR { key } => match already_in_map(&key) {
+            Ok(i) => {
+                let mut map = GLOBAL_NUMBERS.write().unwrap();
+                let counter = map.entry(key).or_insert_with(|| AtomicIsize::new(i));
+                let new_value = counter.fetch_sub(1, Ordering::SeqCst) - 1;
+                format!(":{new_value}")
             }
-        }
+            Err(_) => "-ERR value is not an integer or out of range".to_string(),
+        },
     }
 }
 

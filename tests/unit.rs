@@ -152,24 +152,32 @@ mod base_command_tests {
         assert_eq!(resp, "+OK\r\n");
 
         // =================== INCR AND DECR ========================
-        for i in 1..11 {
-            let resp = c.call_server(Command::cmd_incr("a-key"));
-            assert_eq!(resp, format!(":{}\r\n", i + 100));
+        let mut hs = Vec::new();
+        for _ in 1..101 {
+            let h = thread::spawn(|| {
+                let cn = Connector::with_port("7878");
+                cn.call_server(Command::cmd_incr("a-key"));
+                thread::sleep(Duration::from_millis(1));
+                cn.call_server(Command::cmd_decr("a-key"));
+                thread::sleep(Duration::from_millis(1));
+                cn.call_server(Command::cmd_incr("a-key"));
+            });
+            hs.push(h);
         }
+        hs.into_iter().for_each(|h| {
+            let _ = h.join();
+        });
         // ======
         let resp = c.call_server(Command::cmd_get("a-key"));
-        assert_eq!(resp, "$3\r\n110\r\n");
+        assert_eq!(resp, "$3\r\n200\r\n");
 
-        let resp = c.call_server(Command::cmd_decr("a-key"));
-        assert_eq!(resp, ":109\r\n");
-        
         // =================== GET EXCEPTION =========================
         let resp = c.call_server(Command::cmd_set("a-key", "not-number"));
         assert_eq!(resp, "+OK\r\n");
 
         let resp = c.call_server(Command::cmd_decr("a-key"));
         assert_eq!(resp, "-ERR value is not an integer or out of range\r\n");
-        
+
         flush_all()
     }
 }
